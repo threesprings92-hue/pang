@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>숫자 세기 놀이</title>
+<title>숫자 팡</title>
 <style>
   *{box-sizing:border-box}
   html,body{overscroll-behavior:none;-webkit-touch-callout:none}
@@ -40,11 +40,8 @@
 </style>
 </head>
 <body>
-<h1>🔢 숫자 세기 놀이</h1>
+<h1>🔢 숫자 팡 🎉</h1>
 <div id="top">
-  <button class="chip on" data-max="5">1~5</button>
-  <button class="chip" data-max="10">1~10</button>
-  <button class="chip" data-max="15">1~15</button>
   <span id="stars">⭐ 0</span>
 </div>
 <div id="talk">
@@ -95,7 +92,7 @@ function say(text,rate=1.0){
 }
 
 /* ---------- 게임 ---------- */
-let max=5,stars=0,cur=null,lastN=0,busy=false,autoRun=0;
+let max=15,stars=0,cur=null,lastN=0,busy=false,autoRun=0;
 function newRound(){
   autoRun++;busy=false;
   let n;do{n=1+Math.floor(Math.random()*max)}while(n===lastN&&max>1);lastN=n;
@@ -186,10 +183,6 @@ function confetti(){
 }
 
 /* ---------- 버튼 연결 ---------- */
-document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
-  document.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');
-  max=+c.dataset.max;lastN=0;newRound();
-});
 $('speak').onclick=()=>say($('bubble').textContent);
 $('auto').onclick=()=>{if(!cur.done)autoCount()};
 addEventListener('resize',()=>{if(cur&&!cur.done){const keep=cur.counted.slice();drawThings();
