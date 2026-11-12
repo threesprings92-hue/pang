@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>보석 공주 구구단 팡</title>
+<title>구구단 보석팡</title>
 <style>
   *{box-sizing:border-box}
   html,body{overscroll-behavior:none;-webkit-touch-callout:none}
@@ -40,7 +40,7 @@
 </style>
 </head>
 <body>
-<h1>💎 보석 공주 구구단 팡 💎</h1>
+<h1>💎 구구단 보석팡 💎</h1>
 <div id="stats">
   <div class="box">점수<b id="score">0</b></div>
   <div class="box">맞힌 문제<b id="right">0</b></div>
@@ -106,7 +106,7 @@ function gem(c,t,cx,cy,size,k=1){
 
 /* ---------- 게임판 ---------- */
 let grid=[],sel=null,busy=false,inQuiz=false,score=0,right=0,gauge=0,hint=null,idleT=Date.now(),moving=false,fx=[];
-const GOAL=12,rnd=()=>Math.floor(Math.random()*6);
+const GOAL=3,rnd=()=>Math.floor(Math.random()*6);
 const mk=t=>({t,ox:0,oy:0,s:1,pop:false});
 
 function matches(){
