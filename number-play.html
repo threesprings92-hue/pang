@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>숫자 세기 놀이</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{overscroll-behavior:none;-webkit-touch-callout:none}
+  body{margin:0;min-height:100dvh;padding:10px 14px 18px;background:linear-gradient(#bde7ff,#fff3c4);color:#4a2c82;font-family:"Malgun Gothic",sans-serif;display:flex;flex-direction:column;align-items:center;gap:10px;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  h1{margin:2px 0 0;font-size:24px;text-align:center}
+  #top{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;width:min(100%,440px)}
+  .chip{font-size:16px;border:0;border-radius:20px;padding:8px 14px;background:#fff;color:#4a2c82;box-shadow:0 3px 0 #c9b8f0;font-family:inherit}
+  .chip.on{background:#7b4dff;color:#fff;box-shadow:0 3px 0 #4a2bb0}
+  #stars{font-size:18px;font-weight:bold;background:#fff;border-radius:20px;padding:6px 12px}
+  #talk{display:flex;align-items:center;gap:8px;width:min(100%,440px)}
+  #face{font-size:56px;line-height:1;animation:bob 1.6s ease-in-out infinite}
+  #bubble{flex:1;background:#fff;border:3px solid #ff8fd0;border-radius:18px;padding:8px 12px;font-size:20px;font-weight:bold;position:relative;min-width:0}
+  #bubble:before{content:"";position:absolute;left:-12px;top:22px;border:8px solid transparent;border-right-color:#ff8fd0;border-left:0}
+  #speak{font-size:24px;border:0;background:#ffe0f3;border-radius:14px;padding:8px 10px}
+  #stage{width:min(100%,440px);background:#fff;border-radius:22px;padding:10px;box-shadow:0 5px 0 #c9b8f0;display:flex;flex-direction:column;align-items:center;gap:8px}
+  #things{display:grid;justify-content:center;align-content:center;min-height:160px;width:100%}
+  .th{position:relative;display:flex;align-items:center;justify-content:center;border:0;background:none;padding:0;line-height:1;font-family:inherit}
+  .th:active{transform:scale(.9)}
+  .th.done{animation:hop .4s}
+  .th i{position:absolute;right:2%;bottom:0;min-width:1.3em;font-style:normal;font-size:.34em;font-weight:bold;color:#fff;background:#ff5c9d;border-radius:50%;padding:.08em .22em;text-align:center}
+  #hint{font-size:15px;opacity:.85;text-align:center;min-height:20px}
+  #auto{font-size:17px;border:0;border-radius:16px;padding:8px 16px;background:#ffd86b;color:#4a2c82;box-shadow:0 3px 0 #c9992a;font-family:inherit}
+  #result{font-size:34px;font-weight:bold;min-height:44px;color:#e0348a;text-align:center}
+  #pad{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;width:min(100%,440px)}
+  #pad button{font-size:34px;font-weight:bold;height:min(17vw,76px);border:0;border-radius:18px;background:#7b4dff;color:#fff;box-shadow:0 5px 0 #4a2bb0;font-family:inherit}
+  #pad button:active{transform:translateY(3px);box-shadow:0 2px 0 #4a2bb0}
+  #pad button.bad{background:#bbb;box-shadow:none;animation:shake .3s}
+  #pad button:disabled{opacity:.9}
+  .conf{position:fixed;top:-40px;font-size:30px;pointer-events:none;animation:fall 2.2s linear forwards;z-index:9}
+  @keyframes bob{50%{transform:translateY(-5px) rotate(-4deg)}}
+  @keyframes hop{40%{transform:translateY(-14px) scale(1.15)}}
+  @keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+  @keyframes fall{to{transform:translateY(110vh) rotate(360deg)}}
+</style>
+</head>
+<body>
+<h1>🔢 숫자 세기 놀이</h1>
+<div id="top">
+  <button class="chip on" data-max="5">1~5</button>
+  <button class="chip" data-max="10">1~10</button>
+  <button class="chip" data-max="15">1~15</button>
+  <span id="stars">⭐ 0</span>
+</div>
+<div id="talk">
+  <div id="face">👸</div>
+  <div id="bubble"></div>
+  <button id="speak">🔊</button>
+</div>
+<div id="stage">
+  <div id="things"></div>
+  <div id="hint">👆 하나씩 눌러 보면서 세어 봐요</div>
+  <button id="auto">🎵 같이 세어 볼까요?</button>
+  <div id="result"></div>
+</div>
+<div id="pad"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const THINGS=[
+  {n:'딸기',e:'🍓',u:'개'},{n:'펭귄',e:'🐧',u:'마리'},{n:'자동차',e:'🚗',u:'대'},{n:'사과',e:'🍎',u:'개'},
+  {n:'고양이',e:'🐱',u:'마리'},{n:'별',e:'⭐',u:'개'},{n:'풍선',e:'🎈',u:'개'},{n:'꽃',e:'🌷',u:'송이'},
+  {n:'나비',e:'🦋',u:'마리'},{n:'아이스크림',e:'🍦',u:'개'},{n:'오리',e:'🦆',u:'마리'},{n:'기차',e:'🚂',u:'대'},
+  {n:'토끼',e:'🐰',u:'마리'},{n:'물고기',e:'🐟',u:'마리'},{n:'강아지',e:'🐶',u:'마리'},{n:'바나나',e:'🍌',u:'개'}
+];
+const NATIVE=['','하나','둘','셋','넷','다섯','여섯','일곱','여덟','아홉','열','열하나','열둘','열셋','열넷','열다섯'];
+const ATTRIB={1:'한',2:'두',3:'세',4:'네',11:'열한',12:'열두',13:'열셋',14:'열네'};
+ATTRIB[13]='열세';
+const attrib=n=>ATTRIB[n]||NATIVE[n];
+const josa=(w,a,b)=>((w.charCodeAt(w.length-1)-0xAC00)%28)?a:b; // 받침 있으면 a, 없으면 b
+
+/* ---------- 목소리 (상큼한 한국어 여성 목소리 고르기) ---------- */
+let koVoice=null;
+function loadVoice(){
+  try{
+    const vs=speechSynthesis.getVoices().filter(v=>/^ko/i.test(v.lang));
+    for(const p of[/sunhi|선히/i,/yuna|유나/i,/heami|혜미/i,/google/i,/female|여/i]){const v=vs.find(x=>p.test(x.name));if(v){koVoice=v;return}}
+    koVoice=vs[0]||null;
+  }catch(e){}
+}
+try{loadVoice();speechSynthesis.addEventListener('voiceschanged',loadVoice)}catch(e){}
+function say(text,rate=1.0){
+  try{
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(text);
+    u.lang='ko-KR';if(koVoice)u.voice=koVoice;
+    u.rate=rate;u.pitch=1.25;speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+/* ---------- 게임 ---------- */
+let max=5,stars=0,cur=null,lastN=0,busy=false,autoRun=0;
+function newRound(){
+  autoRun++;busy=false;
+  let n;do{n=1+Math.floor(Math.random()*max)}while(n===lastN&&max>1);lastN=n;
+  const th=THINGS[Math.floor(Math.random()*THINGS.length)];
+  cur={th,n,counted:Array(n).fill(0),next:1,wrong:0,done:false};
+  $('result').textContent='';
+  $('bubble').textContent=`${th.n}${josa(th.n,'은','는')} 모두 몇 ${th.u}일까요?`;
+  $('face').textContent='👸';
+  $('hint').textContent='👆 하나씩 눌러 보면서 세어 봐요';
+  $('auto').style.display='';
+  drawThings();drawPad();
+  say($('bubble').textContent);
+}
+function drawThings(){
+  const box=$('things'),n=cur.n;box.innerHTML='';
+  const cols=n<=2?n:n<=6?3:n<=8?4:5;
+  const w=Math.min(440-40,innerWidth-48);
+  const cell=Math.min(Math.floor(w/cols),n<=2?130:100);
+  box.style.gridTemplateColumns=`repeat(${cols},${cell}px)`;
+  for(let i=0;i<n;i++){
+    const b=document.createElement('button');
+    b.className='th';b.style.width=b.style.height=cell+'px';b.style.fontSize=(cell*.78)+'px';
+    b.textContent=cur.th.e;
+    b.onclick=()=>tapThing(i,b);
+    box.appendChild(b);
+  }
+}
+function tapThing(i,b){
+  if(cur.done)return;
+  if(!cur.counted[i]){cur.counted[i]=cur.next++;
+    const badge=document.createElement('i');badge.textContent=cur.counted[i];b.appendChild(badge);}
+  const k=cur.counted[i];
+  b.classList.remove('done');void b.offsetWidth;b.classList.add('done');
+  say(NATIVE[k],1.0);
+  if(cur.next>cur.n)$('hint').textContent=`다 셌어요! 모두 몇 ${cur.th.u}일까요?`;
+}
+async function autoCount(){
+  const my=++autoRun;
+  const btns=[...document.querySelectorAll('.th')];
+  cur.counted=Array(cur.n).fill(0);cur.next=1;
+  btns.forEach(b=>{const i=b.querySelector('i');if(i)i.remove()});
+  for(let i=0;i<btns.length;i++){
+    if(my!==autoRun||cur.done)return;
+    tapThing(i,btns[i]);
+    await sleep(850);
+  }
+}
+function drawPad(){
+  const p=$('pad');p.innerHTML='';
+  for(let v=1;v<=max;v++){
+    const b=document.createElement('button');b.textContent=v;b.onclick=()=>choose(b,v);p.appendChild(b);
+  }
+}
+async function choose(b,v){
+  if(cur.done||busy)return;
+  say(NATIVE[v]+'?',1.0);
+  if(v!==cur.n){
+    b.classList.add('bad');b.disabled=true;cur.wrong++;
+    $('face').textContent='🥺';
+    await sleep(700);
+    if(cur.done)return;
+    $('face').textContent='👸';
+    const t=cur.wrong>=2?'같이 세어 볼까요?':'괜찮아요! 다시 세어 봐요!';
+    $('hint').textContent=t;say(t);
+    if(cur.wrong>=2){await sleep(1500);autoCount()}
+    return;
+  }
+  cur.done=true;busy=true;autoRun++;
+  stars++;$('stars').textContent='⭐ '+stars;
+  document.querySelectorAll('#pad button').forEach(x=>x.disabled=true);
+  $('auto').style.display='none';$('face').textContent='🥰';
+  const word=`${attrib(cur.n)} ${cur.th.u}`;
+  $('result').textContent=`${cur.n} · ${word}!`;
+  $('hint').textContent='';
+  confetti();
+  say(`정답이에요! ${cur.th.n}${josa(cur.th.n,'이','가')} ${word}예요! 잘했어요!`);
+  await sleep(3200);
+  newRound();
+}
+function confetti(){
+  const set=['🎉','⭐','💖','✨','🍬','🌈'];
+  for(let i=0;i<22;i++){
+    const s=document.createElement('span');s.className='conf';
+    s.textContent=set[i%set.length];s.style.left=Math.random()*95+'vw';
+    s.style.animationDelay=Math.random()*.6+'s';
+    document.body.appendChild(s);setTimeout(()=>s.remove(),3200);
+  }
+}
+
+/* ---------- 버튼 연결 ---------- */
+document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
+  document.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');
+  max=+c.dataset.max;lastN=0;newRound();
+});
+$('speak').onclick=()=>say($('bubble').textContent);
+$('auto').onclick=()=>{if(!cur.done)autoCount()};
+addEventListener('resize',()=>{if(cur&&!cur.done){const keep=cur.counted.slice();drawThings();
+  document.querySelectorAll('.th').forEach((b,i)=>{if(keep[i]){const x=document.createElement('i');x.textContent=keep[i];b.appendChild(x)}})}});
+
+function showErr(e){
+  let d=$('err');
+  if(!d){d=document.createElement('div');d.id='err';d.style.cssText='position:fixed;top:0;left:0;right:0;background:#c00;color:#fff;font-size:12px;padding:4px 8px;z-index:99';document.body.appendChild(d)}
+  d.textContent='오류: '+(e&&e.message||e);
+}
+addEventListener('error',ev=>showErr(ev.message));
+try{newRound()}catch(e){showErr(e)}
+</script>
+</body>
+</html>
