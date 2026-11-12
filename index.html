@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>보석 공주 구구단 팡</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{overscroll-behavior:none;-webkit-touch-callout:none}
+  body{margin:0;min-height:100dvh;padding:10px 16px;background:linear-gradient(#2b1055,#7597de);color:#fff;font-family:"Malgun Gothic",sans-serif;display:flex;flex-direction:column;align-items:center;gap:8px;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  h1{margin:2px 0 0;font-size:22px;text-shadow:0 2px 6px #0006;text-align:center}
+  #stats{display:flex;gap:8px;width:min(100%,420px)}
+  .box{flex:1;background:#0004;border-radius:12px;padding:4px 6px;text-align:center;font-size:13px;min-width:0}
+  .box b{display:block;font-size:20px;color:#ffd86b}
+  select{font-size:14px;border-radius:10px;padding:4px;flex:1;min-width:0}
+  #gaugeWrap{width:min(100%,420px);display:flex;align-items:center;gap:8px;font-size:14px}
+  #gauge{flex:1;height:18px;border-radius:10px;background:#0006;overflow:hidden;border:2px solid #ffd86b}
+  #bar{height:100%;width:0;background:linear-gradient(90deg,#ff8fd0,#ffd86b);transition:width .3s}
+  #board{width:min(calc(100vw - 32px),420px,calc((100dvh - 215px)*7/8));aspect-ratio:7/8;height:auto;background:#120a2a;border:4px solid #ffd86b;border-radius:14px;touch-action:none}
+  small{opacity:.9;text-align:center;font-size:13px}
+  /* 퀴즈 */
+  #quiz{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:5}
+  #card{background:linear-gradient(#fff,#ffeaf6);border:5px solid #ff8fd0;color:#2b1055;border-radius:24px;padding:14px 16px;text-align:center;max-width:94vw;max-height:96dvh;overflow:auto;box-shadow:0 10px 40px #000a}
+  #pr{display:flex;align-items:center;gap:10px;margin-bottom:6px;text-align:left}
+  #face{font-size:60px;line-height:1;animation:bob 1.6s ease-in-out infinite}
+  #bubble{background:#fff;border:3px solid #ff8fd0;border-radius:18px;padding:7px 11px;font-size:15px;max-width:220px;position:relative}
+  #bubble b{display:block;color:#d6336c;font-size:14px}
+  #bubble:before{content:"";position:absolute;left:-12px;top:22px;border:8px solid transparent;border-right-color:#ff8fd0;border-left:0}
+  #speak{font-size:20px;border:0;background:#eee;border-radius:12px;padding:4px 10px}
+  #q{font-size:52px;font-weight:bold;margin:0}
+  #vis{font-size:15px;line-height:1.15;margin:4px 0 8px;max-width:400px;max-height:100px;overflow:auto}
+  #vis span{display:inline-block;margin:2px 4px;padding:2px 5px;background:#f1e9ff;border-radius:8px}
+  #choices{display:flex;gap:10px;justify-content:center}
+  #choices button{font-size:36px;width:30vw;max-width:110px;height:76px;border-radius:18px;border:0;background:#7b4dff;color:#fff;box-shadow:0 5px 0 #4a2bb0;font-family:inherit}
+  #choices button:active{transform:translateY(3px)}
+  #choices button.bad{background:#bbb;box-shadow:none;animation:shake .3s}
+  #msg{height:28px;font-size:20px;margin-top:8px;font-weight:bold}
+  @keyframes bob{50%{transform:translateY(-6px) rotate(-4deg)}}
+  @keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+</style>
+</head>
+<body>
+<h1>💎 보석 공주 구구단 팡 💎</h1>
+<div id="stats">
+  <div class="box">점수<b id="score">0</b></div>
+  <div class="box">맞힌 문제<b id="right">0</b></div>
+  <select id="dan">
+    <option value="0">구구단 전체</option>
+    <option>2</option><option>3</option><option>4</option><option>5</option>
+    <option>6</option><option>7</option><option>8</option><option>9</option>
+  </select>
+</div>
+<div id="gaugeWrap">👸<div id="gauge"><div id="bar"></div></div>🎁</div>
+<canvas id="board"></canvas>
+<small>같은 보석 3개를 나란히 맞추면 팡! 💥<br>보석을 눌러서 옆 보석과 바꾸거나, 손가락으로 밀어 보세요.</small>
+
+<div id="quiz"><div id="card">
+  <div id="pr">
+    <div id="face">👸</div>
+    <div id="bubble"><b id="pname"></b><span id="say"></span></div>
+    <button id="speak">🔊</button>
+  </div>
+  <div id="q"></div>
+  <div id="vis"></div>
+  <div id="choices"></div>
+  <div id="msg"></div>
+</div></div>
+
+<script>
+const R=8,C=7,S=60,cv=document.getElementById('board'),ctx=cv.getContext('2d');
+cv.width=C*S;cv.height=R*S;
+const COLORS=['#4fd8ff','#ffd23f','#3ddc84','#ff5470','#c77dff','#ff9f43'];
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const $=id=>document.getElementById(id);
+
+/* ---------- 보석 그리기 (6가지 모양) ---------- */
+const P=(c,pts)=>{c.beginPath();pts.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.closePath()};
+function gemPath(c,t,x,y,s){
+  const u=(a,b)=>[x+a*s,y+b*s];
+  c.beginPath();
+  switch(t){
+    case 0:P(c,[u(.5,.04),u(.96,.38),u(.5,.96),u(.04,.38)]);break;                         // 다이아몬드
+    case 1:c.arc(x+s/2,y+s/2,s*.46,0,7);break;                                              // 동그라미
+    case 2:P(c,[u(.3,.05),u(.7,.05),u(.95,.3),u(.95,.7),u(.7,.95),u(.3,.95),u(.05,.7),u(.05,.3)]);break; // 에메랄드
+    case 3:c.moveTo(...u(.5,.92));c.bezierCurveTo(...u(.02,.55),...u(.08,.08),...u(.5,.3));
+           c.bezierCurveTo(...u(.92,.08),...u(.98,.55),...u(.5,.92));break;                 // 하트
+    case 4:{const p=[];for(let i=0;i<10;i++){const r=i%2?.2:.5,a=-Math.PI/2+i*Math.PI/5;p.push(u(.5+r*Math.cos(a)*1.05,.53+r*Math.sin(a)*1.05));}P(c,p);break;} // 별
+    case 5:P(c,[u(.5,.06),u(.96,.9),u(.04,.9)]);break;                                      // 삼각형
+  }
+}
+function gem(c,t,cx,cy,size,k=1){
+  const s=size*.86*k,x=cx-s/2,y=cy-s/2,col=COLORS[t];
+  if(s<1)return;
+  c.save();
+  gemPath(c,t,x,y,s);
+  const g=c.createRadialGradient(x+s*.35,y+s*.3,s*.05,x+s/2,y+s/2,s*.62);
+  g.addColorStop(0,'#fff');g.addColorStop(.35,col);g.addColorStop(1,'#0007');
+  c.fillStyle=col;c.fill();c.fillStyle='#ffffff55';c.fill();c.fillStyle=g;c.fill();
+  c.lineWidth=2;c.strokeStyle='#fffc';c.stroke();
+  c.clip();c.strokeStyle='#fff8';c.lineWidth=1.2;
+  c.beginPath();c.moveTo(x+s*.5,y);c.lineTo(x+s*.5,y+s);c.moveTo(x,y+s*.5);c.lineTo(x+s,y+s*.5);c.stroke();
+  c.restore();
+  c.save();c.fillStyle='#fff';c.globalAlpha=.9;
+  c.beginPath();c.ellipse(x+s*.33,y+s*.28,s*.09,s*.055,-.6,0,7);c.fill();c.restore();
+}
+
+/* ---------- 게임판 ---------- */
+let grid=[],sel=null,busy=false,inQuiz=false,score=0,right=0,gauge=0,hint=null,idleT=Date.now(),moving=false,fx=[];
+const GOAL=12,rnd=()=>Math.floor(Math.random()*6);
+const mk=t=>({t,ox:0,oy:0,s:1,pop:false});
+
+function matches(){
+  const m=Array.from({length:R},()=>Array(C).fill(false));
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+    const a=grid[r][c];if(!a)continue;
+    if(c<=C-3&&grid[r][c+1]&&grid[r][c+2]&&grid[r][c+1].t===a.t&&grid[r][c+2].t===a.t)m[r][c]=m[r][c+1]=m[r][c+2]=true;
+    if(r<=R-3&&grid[r+1][c]&&grid[r+2][c]&&grid[r+1][c].t===a.t&&grid[r+2][c].t===a.t)m[r][c]=m[r+1][c]=m[r+2][c]=true;
+  }
+  return m;
+}
+const count=m=>m.flat().filter(Boolean).length;
+function swapData(r1,c1,r2,c2){
+  const a=grid[r1][c1],b=grid[r2][c2];
+  grid[r1][c1]=b;grid[r2][c2]=a;
+  b.ox=c2-c1;b.oy=r2-r1;a.ox=c1-c2;a.oy=r1-r2;
+}
+function findMove(){
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++)for(const [dr,dc] of[[0,1],[1,0]]){
+    const r2=r+dr,c2=c+dc;if(r2>=R||c2>=C)continue;
+    const a=grid[r][c],b=grid[r2][c2];
+    grid[r][c]=b;grid[r2][c2]=a;
+    const ok=count(matches())>0;
+    grid[r][c]=a;grid[r2][c2]=b;
+    if(ok)return[r,c,r2,c2];
+  }
+  return null;
+}
+function init(drop){
+  do{
+    grid=Array.from({length:R},()=>Array(C));
+    for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+      let t;
+      do{t=rnd()}while((c>=2&&grid[r][c-1].t===t&&grid[r][c-2].t===t)||(r>=2&&grid[r-1][c].t===t&&grid[r-2][c].t===t));
+      grid[r][c]=mk(t);
+      if(drop)grid[r][c].oy=-R-r*.3;
+    }
+  }while(!findMove());
+}
+function gravity(){
+  for(let c=0;c<C;c++){
+    let w=R-1;
+    for(let r=R-1;r>=0;r--){
+      if(grid[r][c]){
+        if(w!==r){grid[w][c]=grid[r][c];grid[r][c]=null;grid[w][c].oy=r-w}
+        w--;
+      }
+    }
+    for(let k=w;k>=0;k--){grid[k][c]=mk(rnd());grid[k][c].oy=-(w+1)}
+  }
+}
+function step(){
+  moving=false;
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+    const g=grid[r][c];if(!g)continue;
+    if(g.pop&&g.s>0){g.s=Math.max(0,g.s-.12);moving=true}
+    if(Math.abs(g.ox)>.001){const d=Math.min(.25,Math.abs(g.ox));g.ox-=Math.sign(g.ox)*d;moving=true}
+    if(Math.abs(g.oy)>.001){const d=Math.min(.32,Math.abs(g.oy));g.oy-=Math.sign(g.oy)*d;moving=true}
+  }
+  fx.forEach(f=>f.life-=.02);fx=fx.filter(f=>f.life>0);
+}
+async function settle(){await sleep(40);while(moving)await sleep(16)}
+
+async function resolve(extra){
+  let combo=0,first=true;
+  while(true){
+    const m=first&&extra?extra:matches();first=false;
+    const n=count(m);if(!n)break;
+    combo++;
+    for(let r=0;r<R;r++)for(let c=0;c<C;c++)if(m[r][c])grid[r][c].pop=true;
+    if(combo>1)fx.push({text:`콤보 x${combo}!`,life:1});
+    await settle();
+    for(let r=0;r<R;r++)for(let c=0;c<C;c++)if(m[r][c])grid[r][c]=null;
+    score+=n*10*combo;gauge+=n;ui();
+    gravity();await settle();
+  }
+}
+function ui(){$('score').textContent=score;$('right').textContent=right;$('bar').style.width=Math.min(100,gauge/GOAL*100)+'%'}
+
+async function afterMove(){
+  if(!findMove()){fx.push({text:'보석 섞기! ✨',life:1.2});await sleep(500);init(true);await settle();await resolve()}
+  busy=false;idleT=Date.now();
+  if(gauge>=GOAL)startQuiz();
+}
+async function trySwap(r1,c1,r2,c2){
+  if(busy||inQuiz)return;
+  busy=true;sel=null;hint=null;
+  swapData(r1,c1,r2,c2);await settle();
+  if(count(matches())===0){swapData(r1,c1,r2,c2);await settle()}
+  else await resolve();
+  await afterMove();
+}
+
+/* ---------- 그리기 ---------- */
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const now=Date.now();
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+    ctx.fillStyle=(r+c)%2?'#1d1240':'#241650';ctx.fillRect(c*S,r*S,S,S);
+  }
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+    const g=grid[r][c];if(!g)continue;
+    let k=g.s;
+    if(hint&&((hint[0]===r&&hint[1]===c)||(hint[2]===r&&hint[3]===c)))k*=1+.12*Math.sin(now/130);
+    gem(ctx,g.t,(c+g.ox+.5)*S,(r+g.oy+.5)*S,S,k);
+  }
+  if(sel){
+    ctx.strokeStyle='#fff';ctx.lineWidth=4;ctx.globalAlpha=.6+.4*Math.sin(now/120);
+    ctx.strokeRect(sel.c*S+3,sel.r*S+3,S-6,S-6);ctx.globalAlpha=1;
+  }
+  fx.forEach(f=>{
+    ctx.save();ctx.globalAlpha=Math.min(1,f.life);ctx.font='bold 34px sans-serif';ctx.textAlign='center';
+    ctx.lineWidth=6;ctx.strokeStyle='#2b1055';ctx.fillStyle='#ffd86b';
+    const y=cv.height/2-(1-f.life)*40;ctx.strokeText(f.text,cv.width/2,y);ctx.fillText(f.text,cv.width/2,y);ctx.restore();
+  });
+}
+setInterval(()=>{
+  try{
+    step();draw();
+    if(!busy&&!inQuiz&&!hint&&Date.now()-idleT>6000)hint=findMove(); // 6초 가만히 있으면 힌트
+  }catch(e){showErr(e)}
+},16);
+
+/* ---------- 입력 ---------- */
+let down=null;
+function cellAt(e){
+  const b=cv.getBoundingClientRect();
+  return{r:Math.min(R-1,Math.max(0,Math.floor((e.clientY-b.top)/b.height*R))),c:Math.min(C-1,Math.max(0,Math.floor((e.clientX-b.left)/b.width*C)))};
+}
+cv.addEventListener('pointerdown',e=>{
+  if(busy||inQuiz)return;
+  e.preventDefault();
+  const p=cellAt(e);down={...p,x:e.clientX,y:e.clientY,done:false};
+  idleT=Date.now();hint=null;
+  try{cv.setPointerCapture(e.pointerId)}catch(_){}
+});
+cv.addEventListener('pointermove',e=>{
+  if(!down||down.done||busy)return;
+  const cs=cv.getBoundingClientRect().width/C,dx=e.clientX-down.x,dy=e.clientY-down.y;
+  if(Math.max(Math.abs(dx),Math.abs(dy))<cs*.4)return;
+  down.done=true;
+  let r2=down.r,c2=down.c;
+  if(Math.abs(dx)>Math.abs(dy))c2+=dx>0?1:-1;else r2+=dy>0?1:-1;
+  if(r2>=0&&r2<R&&c2>=0&&c2<C)trySwap(down.r,down.c,r2,c2);
+});
+cv.addEventListener('pointerup',()=>{
+  if(!down)return;
+  const d=down;down=null;if(d.done||busy)return;
+  if(!sel){sel=d;return}
+  if(sel.r===d.r&&sel.c===d.c){sel=null;return}
+  if(Math.abs(sel.r-d.r)+Math.abs(sel.c-d.c)===1){const s=sel;trySwap(s.r,s.c,d.r,d.c)}else sel=d;
+});
+cv.addEventListener('pointercancel',()=>{down=null});
+
+/* ---------- 공주님 구구단 퀴즈 ---------- */
+const SINO=['영','일','이','삼','사','오','육','칠','팔','구'];
+const numKo=n=>n<10?SINO[n]:n<20?'십'+(n%10?SINO[n%10]:''):SINO[Math.floor(n/10)]+'십'+(n%10?SINO[n%10]:'');
+let ans=0,qa=0,qb=0;
+// 상큼한 목소리: 기기에 있는 한국어 여성 목소리 중 가장 자연스러운 것을 고름
+let koVoice=null;
+function loadVoice(){
+  try{
+    const vs=speechSynthesis.getVoices().filter(v=>/^ko/i.test(v.lang));
+    const prefs=[/sunhi|선히/i,/yuna|유나/i,/heami|혜미/i,/google/i,/female|여/i];
+    for(const p of prefs){const v=vs.find(x=>p.test(x.name));if(v){koVoice=v;return}}
+    koVoice=vs[0]||null;
+  }catch(e){}
+}
+try{loadVoice();speechSynthesis.addEventListener('voiceschanged',loadVoice)}catch(e){}
+function say(text){
+  try{
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(text);
+    u.lang='ko-KR';if(koVoice)u.voice=koVoice;
+    u.rate=1.05;u.pitch=1.25;u.volume=1; // 높지만 너무 로봇 같지 않게
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+const qText=()=>`${numKo(qa)} 곱하기 ${numKo(qb)}는 얼마일까요?`;
+$('speak').onclick=()=>say(qText());
+const PRINCESS=['루비','사파이어','에메랄드','다이아','자수정','토파즈'];
+const INTROS=['반짝반짝 보석이 모였어요! 공주님 퀴즈 나가요!','안녕, 나는 보석 공주야! 이 문제 같이 풀어 볼까?','우와, 대단해요! 이번 퀴즈도 맞힐 수 있을까요?','짜잔! 보석 기사님, 퀴즈 나갑니다!'];
+const CHEERS=['정답이에요! 너무 똑똑해요! 보석 비가 내려요!','와아, 대단해요! 반짝반짝 팡팡!','맞았어요! 구구단 박사님이에요!'];
+const OOPS=['괜찮아요, 다시 해 봐요!','아이고, 한 번만 더 생각해 봐요!','거의 다 왔어요! 힘내요!'];
+const pick1=a=>a[Math.floor(Math.random()*a.length)];
+function startQuiz(){
+  inQuiz=true;sel=null;hint=null;
+  const d=+$('dan').value;
+  qa=d||2+Math.floor(Math.random()*8);qb=1+Math.floor(Math.random()*9);ans=qa*qb;
+  $('q').textContent=`${qa} × ${qb} = ?`;
+  const em=pick1(['💎','🔷','💜','💚','❤️','🔶','⭐']);
+  $('vis').innerHTML=Array.from({length:qa},()=>`<span>${em.repeat(qb)}</span>`).join('')+`<div style="font-size:14px;margin-top:4px">${qb}개씩 ${qa}묶음</div>`;
+  const set=new Set([ans]);
+  while(set.size<3){const w=ans+(Math.floor(Math.random()*7)-3)*(Math.random()<.5?1:qa);if(w>0&&w!==ans)set.add(w)}
+  const box=$('choices');box.innerHTML='';
+  [...set].sort(()=>Math.random()-.5).forEach(v=>{const b=document.createElement('button');b.textContent=v;b.onclick=()=>choose(b,v);box.appendChild(b)});
+  $('msg').textContent='';$('face').textContent='👸';
+  $('pname').textContent=`👑 ${pick1(PRINCESS)} 공주`;
+  const intro=pick1(INTROS);$('say').textContent=intro;
+  $('quiz').style.display='flex';
+  say(intro+' '+qText());
+}
+async function choose(b,v){
+  const msg=$('msg');
+  if(v!==ans){
+    b.classList.add('bad');b.disabled=true;
+    msg.textContent='아깝다! 다시 해보자 💪';msg.style.color='#d9480f';
+    const t=pick1(OOPS);$('say').textContent=t;say(t);return;
+  }
+  [...document.querySelectorAll('#choices button')].forEach(x=>x.disabled=true);
+  msg.textContent='🎉 정답! 최고야! 🎉';msg.style.color='#2a9d4b';
+  score+=300;right++;gauge=Math.max(0,gauge-GOAL);ui();
+  const t=pick1(CHEERS);$('say').textContent=t;say(t);$('face').textContent='🥰';
+  await sleep(1700);
+  $('quiz').style.display='none';inQuiz=false;
+  // 보너스: 보석 8개가 한꺼번에 팡!
+  busy=true;
+  const m=Array.from({length:R},()=>Array(C).fill(false));let n=0;
+  while(n<8){const r=Math.floor(Math.random()*R),c=Math.floor(Math.random()*C);if(!m[r][c]){m[r][c]=true;n++}}
+  fx.push({text:'보석 팡! 💥',life:1.2});
+  await resolve(m);gauge=0;ui(); // 보너스로 터진 보석은 게이지에 넣지 않음 (퀴즈가 연달아 나오지 않게)
+  await afterMove();
+}
+
+/* ---------- 오류 표시 + 시작 ---------- */
+function showErr(e){
+  let d=$('err');
+  if(!d){d=document.createElement('div');d.id='err';d.style.cssText='position:fixed;top:0;left:0;right:0;background:#c00;color:#fff;font-size:12px;padding:4px 8px;z-index:99';document.body.appendChild(d)}
+  d.textContent='오류: '+(e&&e.message||e);
+}
+window.addEventListener('error',ev=>showErr(ev.message));
+try{init(true);ui()}catch(e){showErr(e)}
+</script>
+</body>
+</html>
